@@ -1,6 +1,7 @@
 use std::{
     collections::HashMap,
     collections::HashSet,
+    env,
     fs::{self},
     io::{self, Write},
     time::Instant,
@@ -69,10 +70,6 @@ impl<'a> BM25<'a> {
                                 * (*self.doc_lengths.get(doc_index).unwrap_or(&0) as f32
                                     / self.avg_doc_length as f32));
                 score += idf * (numerator / denominator);
-                println!(
-                    "term:{},tf:{},idf:{},num:{},deno:{},score:{},doc_index:{}",
-                    term, tf, idf, numerator, denominator, score, doc_index
-                );
             }
         }
         score
@@ -147,9 +144,14 @@ fn read_file_words(file_path: &str) -> std::io::Result<Vec<String>> {
 }
 
 fn main() {
-    let directory_path = "/home/amrit/rustproj/fulltext/test";
-    let mut all_files = list_files_with_full_paths(directory_path).unwrap();
-    all_files.append(&mut all_files.clone());
+    let args: Vec<String> = env::args().collect();
+    if args.len() < 2 {
+        eprintln!("Usage: {} <text_file_directory>", args[0]);
+        std::process::exit(1);
+    }
+
+    let text_file_dir = &args[1];
+    let mut all_files = list_files_with_full_paths(text_file_dir).unwrap();
     all_files.append(&mut all_files.clone());
     let my: Vec<Vec<String>> = all_files
         .iter()
@@ -160,31 +162,30 @@ fn main() {
     let end_time = Instant::now();
     let duration = end_time.duration_since(start_time);
     println!(
-        "Time taken: {}.{:03} seconds",
+        "Time taken to create index: {}.{:03} seconds",
         duration.as_secs(),
         duration.subsec_millis()
     );
     loop {
-        print!("Enter a query (or 'exit' to quit): ");
+        print!("Enter a search query: ");
         io::stdout().flush().unwrap();
         let mut input = String::new();
         io::stdin().read_line(&mut input).unwrap();
         let query: Vec<&str> = input.split_whitespace().collect();
-        println!("{:?}", query);
-
-        if query.contains(&"exit") {
-            println!("Exiting the program.");
-            break;
-        }
-
         let ranks = ins.rank_documents(query);
-
+        println!("Results:");
         for (index, score) in ranks.iter().take(5) {
             println!(
-                "Document {}: BM25 Score - {}",
-                all_files.get(*index as usize).unwrap(),
+                "{}: BM25 Score - {}",
+                all_files
+                    .get(*index as usize)
+                    .unwrap()
+                    .split("/")
+                    .last()
+                    .unwrap(),
                 score
             );
         }
+        println!("---------------------")
     }
 }
